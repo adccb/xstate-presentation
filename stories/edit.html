@@ -1,0 +1,93 @@
+<p>my name is <span id='name'></span>.</p>
+<button id='edit'>edit</button>
+<button id='save'>save</button>
+
+<style>
+span#name {
+  text-decoration: underline;
+}
+</style>
+
+<script>
+  var { createMachine, interpret, assign } = window.x
+  var name = window.localStorage.getItem('name') || 'autumn'
+  console.log('localStorage says:', name)
+
+  var machine = createMachine({
+    id: 'edit',
+    initial: 'viewing',
+    context: {
+      name,
+      element: document.getElementById('name')
+    },
+    states: {
+      viewing: {
+        entry: [ '_clearSpan', '_displayName' ],
+        on: { EDIT: 'editing' },
+      },
+      editing: {
+        entry: [ '_clearSpan', 'editName' ],
+        on: {
+          SAVE: 'viewing',
+          keyup: { target: 'editing', actions: 'saveName' }
+        }
+      }
+    }
+  },
+  {
+    actions: {
+      editName({ name, element }) {
+        // let's create an <input /> element and stick it
+        // into that same span from the beginning
+        const newInput = document.createElement('input')
+        newInput.value = name
+        element.appendChild(newInput)
+
+        // then listen for keyup events. since DOM events have 
+        // type properties, xstate can handle them natively
+        newInput.addEventListener('keyup', event => 
+          window.machineService.send(event)
+        )
+      },
+      saveName: assign((context, event) => {
+        // since this runs on keyup, this event property
+        // is a DOM-level KeyboardEvent. let's get the value
+        // of the input
+        const { value } = event.target
+
+        // and then we can update localstorage (or, like,
+        // make a request to a database, or do something else)
+        window.localStorage.setItem('name', event.target.value)
+        console.log('localStorage:', event.target.value)
+
+        // since we called assign above, we need to return
+        // a diff representing how the context changed. this
+        // just changes the name, and lets xstate keep its 
+        // reference to the dom element.
+        return { name: value }
+      }),
+
+      // boring DOM functions
+      _clearSpan({ element }) {
+        while(element.firstChild) element.removeChild(element.lastChild)
+      },
+      _displayName({ name, element }) {
+        element.appendChild(document.createTextNode(name))
+      }
+    }
+  })
+  
+
+  // xstate boilerplate (give the dog a bone) and also some
+
+  window.machineService = interpret(machine).start()
+  document.getElementById('edit').addEventListener('click', () =>
+    // if you're not sending a payload, the send function can also
+    // take a string. this gets the same as passing { type: 'EDIT' }
+    window.machineService.send('EDIT')
+  )
+
+  document.getElementById('save').addEventListener('click', () =>
+    window.machineService.send('SAVE')
+  )
+</script>

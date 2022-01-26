@@ -1,0 +1,87 @@
+<div class="stoplight">
+  <span id="stop"></span>
+  <span id="slow"></span>
+  <span id="go"></span>
+</div>
+
+<button id='tick'>TICK</button>
+
+<script>
+  // do (almost) all the DOM interaction we'll need
+  var TICK = document.getElementById('tick')
+  var stop = document.getElementById('stop')
+  var slow = document.getElementById('slow')
+  var go = document.getElementById('go')
+  var setColor = (color, el) =>
+    el.style['background-color'] = color
+
+  // quick little data structure to store <span>s plus
+  // the colors they should turn when lit up
+  var lights = {
+    stop: { el: stop, color: 'red' },
+    slow: { el: slow, color: 'yellow' },
+    go: { el: go, color: 'green' }
+  }
+
+  // do the bartman
+  var { createMachine, interpret } = window.x
+  var handleLights = { entry: 'light', exit: 'douse' }
+
+  var stoplight = createMachine({
+    id: 'light',
+    initial: 'stop',
+    states: {
+      go: {
+        ...handleLights,
+        on: { TICK: 'slow' }
+      },
+      slow: {
+        ...handleLights,
+        on: { TICK: 'stop' }
+      },
+      stop: {
+        ...handleLights,
+        on: { TICK: 'go' }
+      }
+    }
+  },
+  {
+    actions: {
+      light(context, action, meta) {
+        const { el, color } = lights[meta.state.value]
+        // turn on the new light
+        setColor(color, el)
+      },
+      douse(context, action, meta) {
+        const previous = meta.state.history.value
+        // turn off the old light
+        lights[previous].el.style['background-color'] = '#444'
+      }
+    },
+  })
+
+  var stoplightService = interpret(stoplight).start()
+  TICK.addEventListener('click', () =>
+    stoplightService.send({ type: 'TICK' })
+  )
+</script>
+
+<style>
+  .stoplight {
+    height: 400px;
+    width: 200px;
+    background-color: darkgrey;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-around;
+  }
+
+  span {
+    height: 100px;
+    width: 100px;
+    border-radius: 50px;
+    background-color: #444;
+    border: 2px black solid;
+  }
+</style>
